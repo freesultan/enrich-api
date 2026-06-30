@@ -9,6 +9,6 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["api/**/*", "src/**/*"],
+  "include": ["api/**/*", "src/**/*", "netlify/**/*"],
   "exclude": ["node_modules", "dist"]
 }
