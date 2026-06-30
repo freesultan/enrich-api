@@ -1,4 +1,10 @@
-import 'dotenv/config';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load .env.local first, fallback to .env
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
 import express from 'express';
 import { x402 } from '../src/middleware/payment';
 import enrichRoutes from '../src/routes/enrich';

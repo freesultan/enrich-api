@@ -3,11 +3,16 @@ import OpenAI from 'openai';
 
 const router = Router();
 
-// DeepSeek is OpenAI-compatible — just swap the baseURL
-const deepseek = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY!,
-  baseURL: 'https://api.deepseek.com',
-});
+// Lazy getter — client is created on first request, after dotenv has loaded
+function getClient(): OpenAI {
+  if (!process.env.DEEPSEEK_API_KEY) {
+    throw new Error('DEEPSEEK_API_KEY is not set. Add it to your .env.local file.');
+  }
+  return new OpenAI({
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    baseURL: 'https://api.deepseek.com',
+  });
+}
 
 // POST /v1/enrich — $0.05 — full NLP enrichment
 router.post('/enrich', async (req: Request, res: Response) => {
@@ -17,6 +22,7 @@ router.post('/enrich', async (req: Request, res: Response) => {
   }
 
   try {
+    const deepseek = getClient();
     const chat = await deepseek.chat.completions.create({
       model: 'deepseek-chat',
       messages: [
@@ -36,7 +42,7 @@ router.post('/enrich', async (req: Request, res: Response) => {
     const result = JSON.parse(chat.choices[0].message.content ?? '{}');
     return res.json({ ok: true, model: 'deepseek-chat', data: result });
   } catch (err: any) {
-    return res.status(502).json({ error: 'AI backend error', detail: err.message });
+    return res.status(502).json({ error: err.message });
   }
 });
 
@@ -48,6 +54,7 @@ router.post('/summarize', async (req: Request, res: Response) => {
   }
 
   try {
+    const deepseek = getClient();
     const chat = await deepseek.chat.completions.create({
       model: 'deepseek-chat',
       messages: [
@@ -65,7 +72,7 @@ router.post('/summarize', async (req: Request, res: Response) => {
       summary: chat.choices[0].message.content,
     });
   } catch (err: any) {
-    return res.status(502).json({ error: 'AI backend error', detail: err.message });
+    return res.status(502).json({ error: err.message });
   }
 });
 
@@ -77,6 +84,7 @@ router.post('/reason', async (req: Request, res: Response) => {
   }
 
   try {
+    const deepseek = getClient();
     const chat = await deepseek.chat.completions.create({
       model: 'deepseek-reasoner',
       messages: [
@@ -95,7 +103,7 @@ router.post('/reason', async (req: Request, res: Response) => {
       answer: chat.choices[0].message.content,
     });
   } catch (err: any) {
-    return res.status(502).json({ error: 'AI backend error', detail: err.message });
+    return res.status(502).json({ error: err.message });
   }
 });
 
