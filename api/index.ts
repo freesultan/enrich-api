@@ -1,7 +1,6 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// MUST load env before any other local import that reads process.env
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
@@ -10,17 +9,10 @@ import { buildX402 } from '../src/middleware/payment';
 import enrichRoutes from '../src/routes/enrich';
 
 const app = express();
-
 app.use(express.json({ limit: '50kb' }));
 
-// Free endpoints
 app.get('/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    version: '1.0.0',
-    dev_bypass: process.env.DEV_BYPASS === 'true',
-    endpoints: ['/v1/enrich', '/v1/summarize', '/v1/reason'],
-  });
+  res.json({ status: 'ok', version: '1.0.0' });
 });
 
 app.get('/.well-known/x402', (_req, res) => {
@@ -34,17 +26,13 @@ app.get('/.well-known/x402', (_req, res) => {
   });
 });
 
-// Build x402 middleware AFTER dotenv has loaded
-const paymentGate = buildX402();
-
-app.use('/v1', paymentGate);
+// Mount x402 at root so it sees the FULL path (e.g. "POST /v1/enrich")
+app.use(buildX402());
 app.use('/v1', enrichRoutes);
 
 export default app;
 
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT ?? 3000;
-  app.listen(PORT, () =>
-    console.log(`Server running on http://localhost:${PORT} | DEV_BYPASS=${process.env.DEV_BYPASS}`)
-  );
+  app.listen(PORT, () => console.log(`Server: http://localhost:${PORT}`));
 }

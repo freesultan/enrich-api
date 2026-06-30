@@ -3,108 +3,57 @@ import OpenAI from 'openai';
 
 const router = Router();
 
-// Lazy getter — client is created on first request, after dotenv has loaded
 function getClient(): OpenAI {
-  if (!process.env.DEEPSEEK_API_KEY) {
-    throw new Error('DEEPSEEK_API_KEY is not set. Add it to your .env.local file.');
-  }
-  return new OpenAI({
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: 'https://api.deepseek.com',
-  });
+  if (!process.env.DEEPSEEK_API_KEY) throw new Error('DEEPSEEK_API_KEY not set');
+  return new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: 'https://api.deepseek.com' });
 }
 
-// POST /v1/enrich — $0.05 — full NLP enrichment
 router.post('/enrich', async (req: Request, res: Response) => {
   const { text } = req.body;
-  if (!text || typeof text !== 'string') {
-    return res.status(400).json({ error: 'text field is required' });
-  }
-
+  if (!text || typeof text !== 'string') return res.status(400).json({ error: 'text required' });
   try {
-    const deepseek = getClient();
-    const chat = await deepseek.chat.completions.create({
+    const chat = await getClient().chat.completions.create({
       model: 'deepseek-chat',
       messages: [
-        {
-          role: 'system',
-          content: 'You are a text analysis engine. Respond with valid JSON only.',
-        },
-        {
-          role: 'user',
-          content: `Analyze this text and return a JSON object with:\n- "summary": 1-2 sentence summary\n- "keywords": array of 5 key terms\n- "sentiment": "positive" | "negative" | "neutral"\n- "word_count": number\n\nText: ${text.slice(0, 3000)}`,
-        },
+        { role: 'system', content: 'You are a text analysis engine. Respond with valid JSON only.' },
+        { role: 'user', content: `Return a JSON object with:\n- "summary": 1-2 sentence summary\n- "keywords": array of 5 key terms\n- "sentiment": "positive"|"negative"|"neutral"\n- "word_count": number\n\nText: ${text.slice(0, 3000)}` },
       ],
       response_format: { type: 'json_object' },
       max_tokens: 512,
     });
-
-    const result = JSON.parse(chat.choices[0].message.content ?? '{}');
-    return res.json({ ok: true, model: 'deepseek-chat', data: result });
-  } catch (err: any) {
-    return res.status(502).json({ error: err.message });
-  }
+    return res.json({ ok: true, model: 'deepseek-chat', data: JSON.parse(chat.choices[0].message.content ?? '{}') });
+  } catch (err: any) { return res.status(502).json({ error: err.message }); }
 });
 
-// POST /v1/summarize — $0.02 — summary only
 router.post('/summarize', async (req: Request, res: Response) => {
   const { text } = req.body;
-  if (!text || typeof text !== 'string') {
-    return res.status(400).json({ error: 'text field is required' });
-  }
-
+  if (!text || typeof text !== 'string') return res.status(400).json({ error: 'text required' });
   try {
-    const deepseek = getClient();
-    const chat = await deepseek.chat.completions.create({
+    const chat = await getClient().chat.completions.create({
       model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'user',
-          content: `Summarize in 2 sentences, be concise: ${text.slice(0, 3000)}`,
-        },
-      ],
+      messages: [{ role: 'user', content: `Summarize in 2 sentences: ${text.slice(0, 3000)}` }],
       max_tokens: 200,
     });
-
-    return res.json({
-      ok: true,
-      model: 'deepseek-chat',
-      summary: chat.choices[0].message.content,
-    });
-  } catch (err: any) {
-    return res.status(502).json({ error: err.message });
-  }
+    return res.json({ ok: true, model: 'deepseek-chat', summary: chat.choices[0].message.content });
+  } catch (err: any) { return res.status(502).json({ error: err.message }); }
 });
 
-// POST /v1/reason — $0.10 — DeepSeek-R1 reasoning
 router.post('/reason', async (req: Request, res: Response) => {
   const { question } = req.body;
-  if (!question || typeof question !== 'string') {
-    return res.status(400).json({ error: 'question field is required' });
-  }
-
+  if (!question || typeof question !== 'string') return res.status(400).json({ error: 'question required' });
   try {
-    const deepseek = getClient();
-    const chat = await deepseek.chat.completions.create({
+    const chat = await getClient().chat.completions.create({
       model: 'deepseek-reasoner',
-      messages: [
-        {
-          role: 'user',
-          content: question.slice(0, 2000),
-        },
-      ],
+      messages: [{ role: 'user', content: question.slice(0, 2000) }],
       max_tokens: 1024,
     });
-
     return res.json({
       ok: true,
       model: 'deepseek-reasoner',
       reasoning: (chat.choices[0].message as any).reasoning_content ?? null,
       answer: chat.choices[0].message.content,
     });
-  } catch (err: any) {
-    return res.status(502).json({ error: err.message });
-  }
+  } catch (err: any) { return res.status(502).json({ error: err.message }); }
 });
 
 export default router;
