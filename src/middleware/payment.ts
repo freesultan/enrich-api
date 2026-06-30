@@ -1,17 +1,24 @@
 import { RequestHandler } from 'express';
 import { paymentMiddleware, Network } from 'x402-express';
 
-// Set DEV_BYPASS=true in .env.local to skip payment checks locally
 const bypassMiddleware: RequestHandler = (_req, _res, next) => next();
 
-function buildX402(): RequestHandler {
+export function buildX402(): RequestHandler {
   if (process.env.DEV_BYPASS === 'true') {
-    console.warn('[x402] DEV_BYPASS=true — payment checks disabled (local dev only)');
+    console.warn('[x402] DEV_BYPASS=true — payment checks DISABLED (local dev only)');
     return bypassMiddleware;
   }
 
+  if (!process.env.PAYMENT_ADDRESS) {
+    throw new Error('PAYMENT_ADDRESS is not set in your .env.local');
+  }
+  if (!process.env.X402_FACILITATOR_URL) {
+    throw new Error('X402_FACILITATOR_URL is not set in your .env.local');
+  }
+
+  console.log('[x402] Payment middleware ENABLED');
   return paymentMiddleware(
-    process.env.PAYMENT_ADDRESS!,
+    process.env.PAYMENT_ADDRESS,
     {
       'POST /v1/enrich': {
         price: '$0.05',
@@ -29,8 +36,6 @@ function buildX402(): RequestHandler {
         description: 'DeepSeek-R1 chain-of-thought reasoning',
       },
     },
-    { url: process.env.X402_FACILITATOR_URL! }
+    { url: process.env.X402_FACILITATOR_URL }
   );
 }
-
-export const x402 = buildX402();

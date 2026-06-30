@@ -1,12 +1,12 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// Load .env.local first, fallback to .env
+// MUST load env before any other local import that reads process.env
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 import express from 'express';
-import { x402 } from '../src/middleware/payment';
+import { buildX402 } from '../src/middleware/payment';
 import enrichRoutes from '../src/routes/enrich';
 
 const app = express();
@@ -18,6 +18,7 @@ app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     version: '1.0.0',
+    dev_bypass: process.env.DEV_BYPASS === 'true',
     endpoints: ['/v1/enrich', '/v1/summarize', '/v1/reason'],
   });
 });
@@ -33,17 +34,17 @@ app.get('/.well-known/x402', (_req, res) => {
   });
 });
 
-// Paid endpoints — x402 payment gate applied before routes
-app.use('/v1', x402);
+// Build x402 middleware AFTER dotenv has loaded
+const paymentGate = buildX402();
+
+app.use('/v1', paymentGate);
 app.use('/v1', enrichRoutes);
 
-// Required for Vercel serverless
 export default app;
 
-// Local dev only
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT ?? 3000;
   app.listen(PORT, () =>
-    console.log(`Server running on http://localhost:${PORT}`)
+    console.log(`Server running on http://localhost:${PORT} | DEV_BYPASS=${process.env.DEV_BYPASS}`)
   );
 }
